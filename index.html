@@ -370,107 +370,32 @@
     document.getElementById('outputArea').innerHTML = '<div class="placeholder">元記録を貼り付けて「変換」を押してください</div>';
   }
 
-  async function convertRecord() {
+  function convertRecord() {
     const input = document.getElementById('inputRecord').value.trim();
     if (!input) { alert('元記録を入力してください'); return; }
 
     const topics = document.getElementById('inputTopics').value.trim();
     const request = document.getElementById('inputRequest').value.trim();
 
-    const loading = document.getElementById('loading');
-    const btn = document.getElementById('btnConvert');
-    loading.classList.add('show');
-    btn.disabled = true;
+    // 定型文
+    const greeting = 'お世話になっております。本日の記録を転記いたします。大きく変わりありません。引き続きどうぞよろしくお願いします。';
 
-    try {
-      const sendType = currentType === 'normal' ? '普段と変わらない' : 'トピックスあり';
+    // 組み立て
+    let result = greeting + '\n\n';
 
-      let systemPrompt = `あなたは訪問看護ステーション「フェアウィズ訪問看護ステーション」の記録転記アシスタントです。
-訪問看護の電子カルテ記録を、社外（ケアマネジャー・主治医等）へ送信するためのメッセージ文に変換してください。
-
-【出力フォーマット】
-以下の形式で、そのままコピペして送信できる文章を生成してください。
-
----
-お世話になっております。本日の記録を転記いたします。{状態の概要を1文}引き続きどうぞよろしくお願いします。
-
-体温 (℃)：{値}
-血圧(㎜Hg)：{値}
-脈拍数 (回/分)：{値}
-Spo2（％）：{値}
-
-実施内容：{カンマ区切りで列挙}
-医療の実施: {該当あれば記載、なければ「なし」}
-
-記録：
-{元記録の内容を敬語・丁寧語で整理。箇条書きではなく自然な文章で。観察所見、ケア内容、患者・家族の発言、今後の方針などを含む}
----
-
-【ルール】
-- 冒頭の挨拶文は必ず「お世話になっております。本日の記録を転記いたします。」で始める
-- 状態の概要は「大きく変わりありません。」「少し変化がありました。」など端的に
-- バイタルは元記録から正確に抽出し、単位を含めて記載
-- 記録部分は元記録の内容を読みやすく整理するが、情報を省略しない
-- 敬語・丁寧語を使用するが、過度に丁寧にしすぎない
-- 個人情報は元記録のまま維持
-- 医療用語は正確に使用
-- 出力はフォーマット通りのテキストのみ。JSON や見出し記号（【】や■）は使わない`;
-
-      if (sendType === 'トピックスあり') {
-        systemPrompt += `\n\n【トピックスありの場合】
-バイタル情報の前に「★トピックス」セクションを追加してください。
-形式：
-★トピックス
-{要約やトピックスの内容}
-
-宛先への依頼がある場合は、記録の後に依頼内容を追記してください。`;
-      }
-
-      let userMsg = `以下の訪問看護記録を社外送信用フォーマットに変換してください。\n\n送信タイプ：${sendType}\n\n【元記録】\n${input}`;
-
-      if (currentType === 'topics' && topics) {
-        userMsg += `\n\n【トピックス・要約として含めたい内容】\n${topics}`;
-      }
-      if (currentType === 'topics' && request) {
-        userMsg += `\n\n【宛先への依頼】\n${request}`;
-      }
-
-      const response = await fetch('/api/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system: systemPrompt,
-          max_tokens: 1500,
-          messages: [{ role: 'user', content: userMsg }]
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'API error: ' + response.status);
-      }
-      if (!data.content || !Array.isArray(data.content)) {
-        throw new Error('不正なレスポンス形式です');
-      }
-
-      convertedText = data.content
-        .filter(c => c.type === 'text')
-        .map(c => c.text || '')
-        .join('')
-        .trim();
-
-      // ブロック表示用にパーツ分割
-      convertedParts = parseIntoParts(convertedText);
-
-      renderOutput();
-    } catch (err) {
-      console.error(err);
-      document.getElementById('outputArea').innerHTML = `<div class="placeholder" style="color:#dc2626;">変換エラー: ${err.message}</div>`;
-    } finally {
-      loading.classList.remove('show');
-      btn.disabled = false;
+    if (currentType === 'topics' && topics) {
+      result += '★トピックス\n' + topics + '\n\n';
     }
+
+    result += input;
+
+    if (currentType === 'topics' && request) {
+      result += '\n\n' + request;
+    }
+
+    convertedText = result.trim();
+    convertedParts = parseIntoParts(convertedText);
+    renderOutput();
   }
 
   function parseIntoParts(text) {
